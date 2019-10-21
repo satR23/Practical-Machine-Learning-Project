@@ -1,0 +1,108 @@
+---
+title: "Practical Machine Learning Project"
+author: "Sathya Thiruvengadam"
+date: "October 21, 2019"
+output: 
+    html_document:
+        keep md : yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Sathya/Data Science -JH/Practical Machine Learning")
+```
+
+## Executive Summary:
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity, one thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of participants to quantify the quality of the activity. 
+
+###Flow of action:-
+- PreProcess the data, data cleansing.
+- Explore the data, especially focussing on the two paramaters we are interested in.
+- Model exploration, where we perform different models that helps our nature of question.
+- Model examination, determine the accuracy measures.
+- A Conclusion , result of our analysis from the given data.
+- Predicting the classification of the model on test set.
+
+```{r loadlib, include=FALSE }
+library(caret)
+library(tidyverse)
+```
+
+Set working directory, Download the file to working directory
+```{r dircreate, include=FALSE}
+if (!file.exists("./Project")){
+    dir.create("./Project")
+}
+```
+
+
+```{r filedown }
+fileurltrain="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(fileurltrain, destfile="./Project/training.csv")
+datedownloaded <- date()
+fileurltest="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(fileurltest, destfile="./Project/testing.csv" , mode="wb")
+datedownloaded <- date()
+```
+
+Read files from local directory 
+
+```{r readfile}
+trainraw <- read.csv("./Project/training.csv", header = TRUE)
+testraw <- read.csv("./Project/testing.csv", header = TRUE)
+```
+
+###Preprocess the data, 
+As there were variable completely filled with NA's,Removing all NA's columns instead of mutate.
+```{r rmNA}
+trainraw <- trainraw[ , colSums(is.na(trainraw)) == 0 ]
+anyNA(trainraw)
+testraw <- testraw[,colSums(is.na(testraw)) == 0]
+```
+
+Focussing on the analysis question, removed all the unrelated variables. Except outcome variable converted all the independent variables to numeric. Performed the action for train and test datasets.
+```{r rmunrelatedvar}
+classe <- trainraw$classe
+trainrmcol <- grepl("^X|user|timestamp", names(trainraw))
+trainraw <- trainraw[ , !trainrmcol]
+dim(trainraw)
+trainCleaned <- trainraw[, sapply(trainraw, is.numeric)]
+trainCleaned$classe <- classe
+
+testrmcol <- grepl("^X|user|timestamp", names(testraw))
+testraw <- testraw[ , !testrmcol]
+testCleaned <- testraw[, sapply(testraw, is.numeric)]
+```
+
+### Data Slicing:
+Split the train dataset in to two with partition of 70% to build the model and 30% for model validation.
+```{r datapart }
+set.seed(22519) 
+inTrain <- createDataPartition(trainCleaned$classe, p=0.70, list=F)
+trainData <- trainCleaned[inTrain, ]
+testData <- trainCleaned[-inTrain, ]
+```
+
+###Build Model:
+Building the model using RandomForest algorithm with caret package, as randomforest level of accracy is higher compared with decision trees.
+```{r buildRf }
+controlRf <- trainControl(method="cv", 5)
+modelRf <- train(classe ~ ., data=trainData, method="rf", trControl=controlRf, ntree=250)
+modelRf
+```
+
+Turned out random forest have the highest accuracy of 99.4%
+Using the model to perform validation 
+```{r predValid}
+predRf <- predict(modelRf, testData)
+postResample(predRf, testData$classe)
+OoSampleerr <- 1 - as.numeric(confusionMatrix(testData$classe, predRf)$overall[1])
+OoSampleerr
+```
+
+Perform the prediction the test datasets.
+```{r predtestData}
+predTest <- predict(modelRf, testCleaned)
+predTest
+```
